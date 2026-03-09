@@ -20,6 +20,9 @@ _PROMPT_COLORS = [
 _RESET = "\033[0m"
 _DIM = "\033[2m"
 _BOLD = "\033[1m"
+_WHITE = "\033[97m"
+_LABEL = "\033[33m"  # yellow for labels
+_PROMPT_TEXT = "\033[37m"  # white for prompt/reasoning text
 
 
 def _relative_time(timestamp: float) -> str:
@@ -103,19 +106,27 @@ def format_blame_lines(blame_lines: list, *, color: bool = False) -> None:
             else:
                 print(f"       -- {c.provenance} / {sid} / {age} ({version_str}, {line_range})")
             if c.prompt:
+                wrapped = _wrap(c.prompt, 26)
                 if color:
-                    print(f"  {_DIM}{'':>5}    user-prompt: \"{_flatten(c.prompt)}\"{_RESET}")
+                    print(f"          {_LABEL}user-prompt:{_RESET} {_WHITE}\"{wrapped}\"{_RESET}")
                 else:
-                    print(f"          user-prompt: \"{_flatten(c.prompt)}\"")
+                    print(f"          user-prompt: \"{wrapped}\"")
             if c.reasoning:
+                wrapped = _wrap(c.reasoning, 26)
                 if color:
-                    print(f"  {_DIM}{'':>5}    reasoning: \"{_flatten(c.reasoning)}\"{_RESET}")
+                    print(f"          {_LABEL}reasoning:{_RESET}   {_PROMPT_TEXT}\"{wrapped}\"{_RESET}")
                 else:
-                    print(f"          reasoning: \"{_flatten(c.reasoning)}\"")
+                    print(f"          reasoning:   \"{wrapped}\"")
             if c.task_subject:
-                print(f"          task: {c.task_id} ({c.task_subject})")
+                if color:
+                    print(f"          {_LABEL}task:{_RESET} {c.task_id} ({c.task_subject})")
+                else:
+                    print(f"          task: {c.task_id} ({c.task_subject})")
             if c.spec_section:
-                print(f"          spec: {c.spec_section}")
+                if color:
+                    print(f"          {_LABEL}spec:{_RESET} {c.spec_section}")
+                else:
+                    print(f"          spec: {c.spec_section}")
             if c.in_scope is False:
                 print(f"          {_BOLD}\033[31m!! OUT OF SCOPE{_RESET}" if color else
                       f"          !! OUT OF SCOPE")
@@ -190,3 +201,23 @@ def _truncate(text: str, max_len: int) -> str:
     if len(text) > max_len:
         return text[:max_len - 3] + "..."
     return text
+
+
+def _wrap(text: str, indent: int, width: int = 100) -> str:
+    """Word-wrap text with a hanging indent."""
+    text = text.replace("\n", " ").strip()
+    if len(text) + indent <= width:
+        return text
+    words = text.split()
+    lines = []
+    current = ""
+    for word in words:
+        if current and len(current) + 1 + len(word) + indent > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}" if current else word
+    if current:
+        lines.append(current)
+    pad = " " * indent
+    return ("\n" + pad).join(lines)
