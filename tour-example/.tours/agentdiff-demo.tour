@@ -1,0 +1,72 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "AgentDiff: classify support tickets with Claude and iterate on the prompt",
+  "steps": [
+    {
+      "file": "src/templates.js",
+      "description": "**Created file** `src/templates.js`\n\n**user-prompt:** \"I need to classify incoming support tickets — extract intent, urgency, and a summary. Use Claude.\"\n\n**reasoning:** Created the prompt template with a system prompt that sets the role (support ticket classifier) and a classify prompt that asks for intent, urgency, and sentiment extraction. Used XML tags for the ticket input to give Claude clear boundaries.\n",
+      "title": "Write: templates.js — initial prompt",
+      "line": 1
+    },
+    {
+      "file": "src/pipeline.js",
+      "description": "**Created file** `src/pipeline.js`\n\n**user-prompt:** \"I need to classify incoming support tickets — extract intent, urgency, and a summary. Use Claude.\"\n\n**reasoning:** Created the pipeline that sends the prompt to Claude Haiku and returns the parsed classification. Using Haiku for cost efficiency since classification is a structured extraction task — doesn't need Sonnet-level reasoning.\n",
+      "title": "Write: pipeline.js — Claude API call",
+      "line": 1
+    },
+    {
+      "file": "src/templates.js",
+      "description": "**Edited** `src/templates.js`\n\n**user-prompt:** \"it's confusing refund requests with cancellations — a customer asking to cancel and get their money back gets classified as cancellation instead of refund_request\"\n\n**reasoning:** Added explicit disambiguation rules to the prompt. The key distinction: \"refund_request\" is when the customer wants money back for something that already happened, \"cancellation\" is stopping something in the future. Without these rules, the model defaults to surface-level keyword matching (\"cancel\" → cancellation) instead of understanding the actual intent.\n\n```diff\n+ For intent classification:\n+ - \"refund_request\" = customer explicitly asks for money back\n+ - \"cancellation\" = customer wants to cancel a future order or subscription, NOT get money back for a past one\n+ - \"billing_dispute\" = customer says they were charged incorrectly or don't recognize a charge\n+ - \"product_issue\" = item arrived damaged, wrong item, or doesn't work as described\n```\n",
+      "title": "Edit: add intent disambiguation rules",
+      "line": 18
+    },
+    {
+      "file": "src/examples.json",
+      "description": "**Created file** `src/examples.json`\n\n**user-prompt:** \"add few-shot examples so it handles the tricky cases — especially the refund vs cancellation edge case\"\n\n**reasoning:** Created four few-shot examples covering the most common intents. The first example deliberately shows a case where a customer mentions a damaged item AND wants money back — this anchors the model on \"refund_request\" when both signals are present. The cancellation example is clean (no refund language) to sharpen the contrast.\n",
+      "title": "Write: examples.json — few-shot examples",
+      "line": 1
+    },
+    {
+      "file": "src/templates.js",
+      "description": "**Edited** `src/templates.js`\n\n**user-prompt:** \"add few-shot examples so it handles the tricky cases — especially the refund vs cancellation edge case\"\n\n**reasoning:** Wired the few-shot examples into the classify prompt using XML `<examples>` tags. The `buildPrompt` function now injects them at call time so examples can be updated without changing the template string.\n\n```diff\n+ <examples>\n+ {few_shot_examples}\n+ </examples>\n```\n\n```diff\n+ function buildPrompt(ticketText, examples) {\n+   const exampleBlock = examples\n+     .map(\n+       (ex, i) =>\n+         `<example>\\nTicket: ${ex.input}\\nOutput: ${JSON.stringify(ex.output)}\\n</example>`\n+     )\n+     .join(\"\\n\\n\");\n```\n",
+      "title": "Edit: wire few-shot examples into prompt",
+      "line": 27
+    },
+    {
+      "file": "src/validator.js",
+      "description": "**Created file** `src/validator.js`\n\n**user-prompt:** \"the output format is inconsistent — sometimes Claude returns markdown or adds explanation text around the JSON\"\n\n**reasoning:** Added Zod schema validation to enforce the exact output shape. If Claude returns markdown-wrapped JSON or extra text, the parse will fail and the pipeline will retry. This is more robust than trying to strip markdown in post-processing.\n",
+      "title": "Write: validator.js — Zod schema enforcement",
+      "line": 1
+    },
+    {
+      "file": "src/pipeline.js",
+      "description": "**Edited** `src/pipeline.js`\n\n**user-prompt:** \"the output format is inconsistent — sometimes Claude returns markdown or adds explanation text around the JSON\"\n\n**reasoning:** Added a retry loop around the classify call. If Zod validation fails (malformed JSON, missing fields, wrong enum value), it retries up to 2 more times. In practice Claude almost always gets it right on the first try with the schema in the prompt, but the retry makes it production-safe.\n\n```diff\n+ const { validateClassification } = require(\"./validator\");\n```\n\n```diff\n- const parsed = JSON.parse(response.content[0].text);\n- return parsed;\n+ const text = response.content[0].text;\n+ const result = validateClassification(text);\n+ if (result.success) {\n+   return result.data;\n+ }\n+ if (attempt < retries) {\n+   console.warn(`Validation failed (attempt ${attempt + 1}), retrying...`);\n+ }\n```\n",
+      "title": "Edit: add retry loop with validation",
+      "line": 9
+    },
+    {
+      "file": "src/templates.js",
+      "description": "**Edited** `src/templates.js`\n\n**user-prompt:** \"we're getting Spanish and Portuguese tickets now, make sure it handles those\"\n\n**reasoning:** Added `language` field to the extraction schema and a rule that the summary should always be in English regardless of input language. This avoids a common failure mode where the model summarizes in the same language as the ticket, which breaks downstream English-only dashboards.\n\n```diff\n+ 4. language — the ISO 639-1 code of the ticket language\n+ 5. summary — a one-sentence summary in English regardless of input language\n```\n",
+      "title": "Edit: add multi-language support to prompt",
+      "line": 11
+    },
+    {
+      "file": "src/examples.json",
+      "description": "**Edited** `src/examples.json`\n\n**user-prompt:** \"we're getting Spanish and Portuguese tickets now, make sure it handles those\"\n\n**reasoning:** Added a Spanish-language ticket example to the few-shot set. The output shows `language: \"es\"` and an English summary, which teaches the model the expected behavior for non-English input.\n\n```diff\n+ {\n+   \"input\": \"Hola, compré unas zapatillas talla 42 pero me llegaron talla 38. Necesito que me envíen las correctas.\",\n+   \"output\": {\n+     \"intent\": \"product_issue\",\n+     \"urgency\": \"medium\",\n+     \"sentiment\": \"frustrated\",\n+     \"language\": \"es\",\n+     \"summary\": \"Customer received wrong shoe size (got 38, ordered 42) and wants the correct pair sent.\",\n+     \"suggested_action\": \"Arrange replacement shipment with correct size and provide return label for wrong item.\",\n+     \"requires_escalation\": false\n+   }\n+ }\n```\n",
+      "title": "Edit: add Spanish ticket example",
+      "line": 33
+    },
+    {
+      "file": "src/templates.js",
+      "description": "**Edited** `src/templates.js`\n\n**user-prompt:** \"add an escalation flag — legal threats, safety issues, or repeated failures should go to a supervisor\"\n\n**reasoning:** Added `requires_escalation` boolean to the extraction schema and updated the JSON output format. The model now flags tickets that need human supervisor review, which feeds into the routing logic downstream.\n\n```diff\n+ 7. requires_escalation — true if this needs a supervisor (e.g. legal threats, safety issues, repeated failures)\n```\n\n*task: Add escalation detection*\n",
+      "title": "Edit: add escalation flag to prompt",
+      "line": 15
+    },
+    {
+      "file": "src/templates.js",
+      "description": "**Edited** `src/templates.js`\n\n**reasoning:** Changed the system prompt from generic \"AI assistant\" to a more specific role description and added the instruction to always respond in valid JSON with no markdown.\n\n```diff\n- const SYSTEM_PROMPT = `You are a helpful AI assistant that classifies support tickets.`;\n+ const SYSTEM_PROMPT = `You are a support ticket classifier for an e-commerce platform.\n+ Analyze each ticket and extract structured data.\n+ \n+ Always respond in valid JSON. No markdown, no explanation — just the JSON object.`;\n```\n\n**!! OUT OF SCOPE** — agent modified the system prompt without being asked\n",
+      "title": "Edit: system prompt rewrite (OUT OF SCOPE)",
+      "line": 1
+    }
+  ]
+}

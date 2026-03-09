@@ -1,0 +1,50 @@
+[
+  {
+    "input": "I ordered a blender 2 weeks ago and it arrived with a cracked lid. I want my money back.",
+    "output": {
+      "intent": "refund_request",
+      "urgency": "medium",
+      "sentiment": "frustrated",
+      "language": "en",
+      "summary": "Customer received a blender with a cracked lid and wants a refund.",
+      "suggested_action": "Verify order and initiate refund for damaged item.",
+      "requires_escalation": false
+    }
+  },
+  {
+    "input": "Cancel my subscription before the next billing cycle please. No issues, just don't need it anymore.",
+    "output": {
+      "intent": "cancellation",
+      "urgency": "medium",
+      "sentiment": "neutral",
+      "language": "en",
+      "summary": "Customer wants to cancel their subscription before next billing cycle.",
+      "suggested_action": "Process subscription cancellation and confirm no further charges.",
+      "requires_escalation": false
+    }
+  },
+  {
+    "input": "There's a $49.99 charge on my card from your store but I never bought anything. This is fraud and I'm contacting my bank.",
+    "output": {
+      "intent": "billing_dispute",
+      "urgency": "critical",
+      "sentiment": "frustrated",
+      "language": "en",
+      "summary": "Customer reports an unrecognized $49.99 charge and suspects fraud.",
+      "suggested_action": "Immediately look up charge by card last-4 and investigate. Escalate to fraud team.",
+      "requires_escalation": true
+    }
+  },
+  {
+    "input": "Hola, compré unas zapatillas talla 42 pero me llegaron talla 38. Necesito que me envíen las correctas.",
+    "output": {
+      "intent": "product_issue",
+      "urgency": "medium",
+      "sentiment": "frustrated",
+      "language": "es",
+      "summary": "Customer received wrong shoe size (got 38, ordered 42) and wants the correct pair sent.",
+      "suggested_action": "Arrange replacement shipment with correct size and provide return label for wrong item.",
+      "requires_escalation": false
+    }
+  }
+]
