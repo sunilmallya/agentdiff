@@ -1,8 +1,8 @@
 # AgentDiff
 
-**`git blame` for AI-generated code.**
+**The missing audit trail for AI-generated code.**
 
-Point at any line. See the prompt that caused it, why the agent wrote it that way, and which requirement it fulfills.
+Point at any line. See the prompt that caused it, the reasoning behind it, and whether it was supposed to happen.
 
 ## Why
 
