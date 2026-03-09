@@ -72,7 +72,7 @@ $ agentdiff blame src/auth.py:17 --history
 AgentDiff is **language agnostic** — it tracks changes to any file type (Python, TypeScript, Rust, Go, etc.). The tool itself is written in Python for readability, but it works with any codebase.
 
 ```bash
-brew install sunilmallya/tap/agentdiff
+curl -fsSL https://raw.githubusercontent.com/sunilmallya/agentdiff/main/install.sh | sh
 ```
 
 Or with pip:
