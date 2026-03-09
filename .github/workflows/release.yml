@@ -13,11 +13,7 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            arch: arm64
             artifact: agentdiff-darwin-arm64
-          - os: macos-13
-            arch: x86_64
-            artifact: agentdiff-darwin-x86_64
           - os: ubuntu-latest
             arch: x86_64
             artifact: agentdiff-linux-x86_64
