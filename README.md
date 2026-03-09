@@ -120,7 +120,7 @@ agentdiff relink                         # re-match changes to spec headings
 
 ## VS Code CodeTour Integration
 
-Instead of building a custom VS Code extension, AgentDiff generates standard [CodeTour](https://marketplace.visualstudio.com/items?itemName=vsls-liveshare.codetour) files — a well-established extension with 1M+ installs used for onboarding and code walkthroughs. `agentdiff tour` produces a `.tour` file that lets you step through every agent change directly in VS Code — with the prompt, reasoning, and diff shown inline at each stop.
+Instead of building a custom VS Code extension, AgentDiff generates standard [CodeTour](https://marketplace.visualstudio.com/items?itemName=vsls-contrib.codetour) files — a popular extension used for onboarding and code walkthroughs. `agentdiff tour` produces a `.tour` file that lets you step through every agent change directly in VS Code — with the prompt, reasoning, and diff shown inline at each stop.
 
 ![AgentDiff CodeTour in VS Code](agentdiff-vscode.png)
 
@@ -128,7 +128,7 @@ Instead of building a custom VS Code extension, AgentDiff generates standard [Co
 
 1. Install the CodeTour extension in VS Code:
    ```
-   code --install-extension vsls-liveshare.codetour
+   code --install-extension vsls-contrib.codetour
    ```
    Or search "CodeTour" in the Extensions panel.
 
