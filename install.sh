@@ -2,7 +2,6 @@
 set -e
 
 REPO="sunilmallya/agentdiff"
-INSTALL_DIR="/usr/local/bin"
 
 # Detect OS and architecture
 OS="$(uname -s)"
@@ -32,16 +31,44 @@ fi
 
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${BINARY}"
 
-echo "Installing agentdiff ${LATEST} (${OS_TAG}/${ARCH_TAG})..."
+echo "agentdiff ${LATEST} (${OS_TAG}/${ARCH_TAG})"
+echo ""
+echo "Where do you want to install?"
+echo "  1) /usr/local/bin (recommended, may need sudo)"
+echo "  2) ~/.local/bin"
+echo "  3) Custom path"
+printf "Choice [1]: "
+read -r choice
 
-curl -fsSL "$URL" -o /tmp/agentdiff
-chmod +x /tmp/agentdiff
+case "$choice" in
+  2) INSTALL_DIR="${HOME}/.local/bin" ;;
+  3) printf "Path: "; read -r INSTALL_DIR ;;
+  *) INSTALL_DIR="/usr/local/bin" ;;
+esac
+
+echo "Installing to ${INSTALL_DIR}..."
+mkdir -p "$INSTALL_DIR"
 
 if [ -w "$INSTALL_DIR" ]; then
-  mv /tmp/agentdiff "$INSTALL_DIR/agentdiff"
+  curl -fsSL "$URL" -o "$INSTALL_DIR/agentdiff"
 else
-  echo "Need sudo to install to ${INSTALL_DIR}"
-  sudo mv /tmp/agentdiff "$INSTALL_DIR/agentdiff"
+  sudo curl -fsSL "$URL" -o "$INSTALL_DIR/agentdiff"
 fi
+chmod +x "$INSTALL_DIR/agentdiff"
 
-echo "Installed: $(agentdiff --version)"
+# Check if install dir is in PATH
+case ":$PATH:" in
+  *":$INSTALL_DIR:"*)
+    echo "Installed: $INSTALL_DIR/agentdiff"
+    ;;
+  *)
+    echo ""
+    echo "Installed: $INSTALL_DIR/agentdiff"
+    echo ""
+    echo ">>> $INSTALL_DIR is not in your PATH. Run this to fix:"
+    echo ""
+    echo "    echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+    echo ""
+    echo "    (Use ~/.bashrc instead if you use bash)"
+    ;;
+esac
