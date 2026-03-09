@@ -38,11 +38,11 @@ echo "  1) /usr/local/bin (recommended, may need sudo)"
 echo "  2) ~/.local/bin"
 echo "  3) Custom path"
 printf "Choice [1]: "
-read -r choice
+read -r choice </dev/tty
 
 case "$choice" in
   2) INSTALL_DIR="${HOME}/.local/bin" ;;
-  3) printf "Path: "; read -r INSTALL_DIR ;;
+  3) printf "Path: "; read -r INSTALL_DIR </dev/tty ;;
   *) INSTALL_DIR="/usr/local/bin" ;;
 esac
 
