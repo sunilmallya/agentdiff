@@ -1,12 +1,18 @@
 """Top-level CLI entry point."""
 
-from importlib.metadata import version as pkg_version
-
 import click
 
 
+def _get_version():
+    try:
+        from importlib.metadata import version as pkg_version
+        return pkg_version("agentdiff")
+    except Exception:
+        return "0.1.0"
+
+
 @click.group()
-@click.version_option(version=pkg_version("agentdiff"), prog_name="agentdiff")
+@click.version_option(version=_get_version(), prog_name="agentdiff")
 def cli():
     """AgentDiff -- track every change an AI coding agent makes."""
     pass
