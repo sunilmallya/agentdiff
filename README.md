@@ -2,7 +2,9 @@
 
 **The missing audit trail for AI-generated code.**
 
-Point at any line. See the prompt that caused it, the reasoning behind it, and whether it was supposed to happen.
+AgentDiff is a CLI tool that hooks into Claude Code and tracks every file change with its prompt, reasoning, and task context. Think `git blame`, but for the *why* behind AI-generated code. Works with any language, any codebase.
+
+Point at any line and see who wrote it, agent or human, the prompt that caused it, and the reasoning behind the change. Agent metadata is automatically attached to commits as git notes, so PR reviewers get the full context without leaving `git log`.
 
 ## Install
 
