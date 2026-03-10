@@ -75,33 +75,30 @@ $ agentdiff blame src/auth.py:17 --history
 
 ### Human + Agent Iterations
 
-Real vibe coding is iterative — the agent writes code, you tweak it, the agent refines it. AgentDiff tracks both sides. When a human edits lines within an agent-written block, each line keeps its correct attribution:
+When you edit agent-written code, most tools lose track of who wrote what. AgentDiff doesn't — it attributes each line independently, so inserting or modifying a line doesn't break the surrounding attribution:
 
 ```
-$ agentdiff blame prompt.py
+$ agentdiff blame src/auth.py
 
-     1 | SYSTEM_PROMPT = """You are a support ticket classifier.
-     2 | Analyze each ticket and extract structured data.
-     ...
-    21 | - positive, neutral, negative, or mixed
-       -- agent / 55d2 / 11m ago (v1, L1-21)
-          user-prompt: "improve the prompt to include more instructions"
+     4 | def login(email, password):
+     5 |     user = db.users.find_one({"email": email})
+     6 |     if not user or not check_password(password, user["hash"]):
+     7 |         return jsonify({"error": "Invalid credentials"}), 401
+       -- agent / a1f3 / 5m ago (v1, L4-7)
+          user-prompt: "add login endpoint with JWT"
+          reasoning:   "Implemented email/password login returning a signed JWT."
 
-    22 | ## Output Format
-       -- agent / c3d5 / 7m ago (v2, L22)
-          user-prompt: "fix prompt a little"
+     8 |     log.info(f"login success: {email}")
+       -- human / uncommitted / just now
+          author: Sunil Mallya
 
-    23 | Sunil edits this
-       -- human (no agent change recorded)
-
-    24 | Respond with a single JSON object (no markdown fences):
-     ...
-    41 | - Use null (not the string "null") for missing fields."""
-       -- agent / c3d5 / 7m ago (v1, L24-41)
-          user-prompt: "fix prompt a little"
+     9 |     token = jwt.encode({"sub": str(user["_id"])}, SECRET_KEY)
+    10 |     return jsonify({"token": token})
+       -- agent / a1f3 / 5m ago (v1, L9-10)
+          user-prompt: "add login endpoint with JWT"
 ```
 
-Line 23 was inserted by a human — it shows up as `human`. The agent-written lines around it keep their prompt and reasoning. No attribution is lost.
+The developer inserted an audit log on line 8. The agent-written lines above and below keep their prompt and reasoning intact.
 
 ---
 
@@ -283,9 +280,7 @@ Run `agentdiff relink` after updating spec headings.
 | Git notes            | Commit-level summaries for PRs and CI                          | Done    |
 | Temporal replay      | Step through a session as a timeline of tasks                  | Planned |
 | Collision detection  | Alert when two sessions touch the same file                    | Planned |
-| Risk scoring         | Rule-based, per-commit scoring for code review                 | Planned |
 | Semantic rollback    | Undo a task without disturbing other changes                   | Planned |
-| VS Code extension    | Inline blame annotations and change timeline in the editor     | Planned |
 
 ---
 

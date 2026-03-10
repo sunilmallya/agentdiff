@@ -17,6 +17,7 @@ Extract:
 5. summary — a one-sentence summary in English regardless of input language
 6. suggested_action — what the support agent should do first
 7. requires_escalation — true if this needs a supervisor (e.g. legal threats, safety issues, repeated failures)
+8. confidence — low, medium, or high — how confident are you in the classification?
 
 For intent classification:
 - "refund_request" = customer explicitly asks for money back
@@ -36,7 +37,8 @@ Respond with a JSON object matching this exact schema:
   "language": string,
   "summary": string,
   "suggested_action": string,
-  "requires_escalation": boolean
+  "requires_escalation": boolean,
+  "confidence": string
 }}`;
 
 function buildPrompt(ticketText, examples) {

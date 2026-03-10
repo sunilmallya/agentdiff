@@ -58,6 +58,12 @@
     },
     {
       "file": "src/templates.js",
+      "description": "**Human edit** `src/templates.js`\n\nA developer manually added a `confidence` field to the extraction schema. This was NOT prompted to an agent — it was typed directly in an editor.\n\n```diff\n  7. requires_escalation — true if this needs a supervisor\n+ 8. confidence — low, medium, or high — how confident are you in the classification?\n```\n\n`agentdiff blame` correctly identifies this as a **human** edit while keeping the agent attribution on surrounding lines:\n\n```\n    19 | 7. requires_escalation — true if this needs a supervisor\n         -- agent / d607 / 4m ago (v1, L19)\n            user-prompt: \"add an escalation flag\"\n\n    20 | 8. confidence — low, medium, or high\n         -- human (no agent change recorded)\n\n    21 |\n    22 | For intent classification:\n         -- agent / a1f3 / 8m ago (v1, L22)\n            user-prompt: \"it's confusing refund requests with cancellations\"\n```\n\nThis is the key insight: **no attribution is lost** when a human edits agent-written code. Each line keeps its correct provenance.\n",
+      "title": "Human edit: add confidence field (interleaved attribution)",
+      "line": 20
+    },
+    {
+      "file": "src/templates.js",
       "description": "**Edited** `src/templates.js`\n\n**user-prompt:** \"add an escalation flag — legal threats, safety issues, or repeated failures should go to a supervisor\"\n\n**reasoning:** Added `requires_escalation` boolean to the extraction schema and updated the JSON output format. The model now flags tickets that need human supervisor review, which feeds into the routing logic downstream.\n\n```diff\n+ 7. requires_escalation — true if this needs a supervisor (e.g. legal threats, safety issues, repeated failures)\n```\n\n*task: Add escalation detection*\n",
       "title": "Edit: add escalation flag to prompt",
       "line": 15

@@ -17,6 +17,7 @@ const TicketClassification = z.object({
   summary: z.string().min(10).max(300),
   suggested_action: z.string().min(5).max(500),
   requires_escalation: z.boolean(),
+  confidence: z.enum(["low", "medium", "high"]),
 });
 
 function validateClassification(raw) {
