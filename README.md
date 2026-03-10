@@ -4,6 +4,35 @@
 
 Point at any line. See the prompt that caused it, the reasoning behind it, and whether it was supposed to happen.
 
+## Install
+
+AgentDiff is **language agnostic** — it tracks changes to any file type (Python, TypeScript, Rust, Go, etc.). The tool itself is written in Python for readability, but it works with any codebase.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sunilmallya/agentdiff/main/install.sh | sh
+```
+
+Or with pip:
+
+```bash
+pip install agentdiff
+```
+
+Then initialize in any project directory:
+
+```bash
+cd my-project
+agentdiff init       # creates .agentdiff/, registers Claude Code hooks, starts daemon
+```
+
+That's it. Start coding with Claude Code -- every change is tracked automatically.
+
+```bash
+agentdiff teardown   # clean removal when you're done
+```
+
+---
+
 ## Why
 
 When you vibe code, you lose track. The agent touches 15 files in 30 seconds. You can't tell which lines are yours, why the agent made a specific choice, or if it silently "fixed" something you never asked it to touch.
@@ -102,35 +131,6 @@ The developer inserted an audit log on line 8. The agent-written lines above and
 
 ---
 
-## Install
-
-AgentDiff is **language agnostic** — it tracks changes to any file type (Python, TypeScript, Rust, Go, etc.). The tool itself is written in Python for readability, but it works with any codebase.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sunilmallya/agentdiff/main/install.sh | sh
-```
-
-Or with pip:
-
-```bash
-pip install agentdiff
-```
-
-Then initialize in any project directory:
-
-```bash
-cd my-project
-agentdiff init       # creates .agentdiff/, registers Claude Code hooks, starts daemon
-```
-
-That's it. Start coding with Claude Code -- every change is tracked automatically.
-
-```bash
-agentdiff teardown   # clean removal when you're done
-```
-
----
-
 ## Commands
 
 ```bash
@@ -150,6 +150,43 @@ agentdiff tour --file=<path>             # tour changes to one file
 agentdiff doctor                         # check daemon, hooks, config
 agentdiff relink                         # re-match changes to spec headings
 ```
+
+---
+
+## Git Notes (automatic)
+
+Every commit gets a git note with the prompts, reasoning, and files the agent touched. This happens automatically via pre-commit and post-commit hooks — no extra steps.
+
+```
+$ git log --notes=agentdiff -1
+
+commit a3f1b2c
+Author: Sunil Mallya <mallya.16@gmail.com>
+Date:   Mon Mar 10 09:09:44 2026 -0700
+
+    add JWT auth
+
+Notes (agentdiff):
+    {
+      "total_changes": 3,
+      "provenance": "agent",
+      "prompts": [
+        "add login endpoint with JWT",
+        "pin JWT to HS256 only"
+      ],
+      "files": {
+        "src/auth.py": {
+          "edits": 3,
+          "reasoning": [
+            "Implemented email/password login returning a signed JWT.",
+            "Restricted to HS256 to prevent algorithm confusion attacks."
+          ]
+        }
+      }
+    }
+```
+
+A PR reviewer sees exactly what was asked, why the agent made each choice, and which files were agent-authored — without leaving `git log`. Notes travel with pushes (`git push origin refs/notes/agentdiff`) and are visible on GitHub via the API.
 
 ---
 
@@ -226,44 +263,7 @@ Human edits (vim, VS Code, etc.)     agentdiff blame
 
 **The daemon** is a Python HTTP server (`ThreadingMixIn` + `AF_UNIX`) that appends change records to a per-session JSONL log. At session end, it calls `claude -p` (haiku) to generate reasoning summaries from the actual diffs.
 
-**Git notes** attach agent metadata to commits automatically — see below.
-
----
-
-## Git Notes (automatic)
-
-Every commit gets a git note with the prompts, reasoning, and files the agent touched. This happens automatically via pre-commit and post-commit hooks — no extra steps.
-
-```
-$ git log --notes=agentdiff -1
-
-commit a3f1b2c
-Author: Sunil Mallya <mallya.16@gmail.com>
-Date:   Mon Mar 10 09:09:44 2026 -0700
-
-    add JWT auth
-
-Notes (agentdiff):
-    {
-      "total_changes": 3,
-      "provenance": "agent",
-      "prompts": [
-        "add login endpoint with JWT",
-        "pin JWT to HS256 only"
-      ],
-      "files": {
-        "src/auth.py": {
-          "edits": 3,
-          "reasoning": [
-            "Implemented email/password login returning a signed JWT.",
-            "Restricted to HS256 to prevent algorithm confusion attacks."
-          ]
-        }
-      }
-    }
-```
-
-A PR reviewer sees exactly what was asked, why the agent made each choice, and which files were agent-authored — without leaving `git log`. Notes travel with pushes (`git push origin refs/notes/agentdiff`) and are visible on GitHub via the API.
+**Git notes** attach agent metadata to commits automatically — see above.
 
 ---
 
