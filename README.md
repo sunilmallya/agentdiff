@@ -17,7 +17,8 @@ $ agentdiff blame src/auth.py
 
      1 | from flask import request, jsonify
      2 | import jwt, os
-       -- human (no agent change recorded)
+       -- human / uncommitted / 3m ago
+          author: Sunil Mallya
 
      4 | def login(email, password):
      5 |     user = db.users.find_one({"email": email})
@@ -26,9 +27,9 @@ $ agentdiff blame src/auth.py
      8 |     token = jwt.encode({"user_id": str(user["_id"])}, os.environ["SECRET_KEY"])
      9 |     return jsonify({"token": token})
        -- agent / a1f3 / 5m ago (v1, L4-9)
-          prompt: "add login endpoint with JWT"
-          reasoning: "Implemented email/password login that returns a signed JWT.
-                      Uses bcrypt hash check and reads SECRET_KEY from env."
+          user-prompt: "add login endpoint with JWT"
+          reasoning:   "Implemented email/password login that returns a signed JWT.
+                          Uses bcrypt hash check and reads SECRET_KEY from env."
 
     11 | def require_auth(f):
     12 |     def wrapper(*args, **kwargs):
@@ -43,27 +44,64 @@ $ agentdiff blame src/auth.py
     21 |         return f(*args, **kwargs)
     22 |     return wrapper
        -- agent / a1f3 / 2m ago (v2, L11-22)
-          prompt: "add auth middleware to protect routes"
-          reasoning: "Added decorator that extracts and validates JWT from the
-                      Authorization header. Attaches user_id to request context
-                      so route handlers can access the authenticated user."
+          user-prompt: "add auth middleware to protect routes"
+          reasoning:   "Added decorator that extracts and validates JWT from the
+                          Authorization header. Attaches user_id to request context
+                          so route handlers can access the authenticated user."
 ```
 
-See how a line evolved across iterations:
+See how a single line evolved — agent writes, agent refines, human hardens:
 
 ```
 $ agentdiff blame src/auth.py:17 --history
 
-  17 | payload = jwt.decode(token, os.environ["SECRET_KEY"], algorithms=["HS256"])
+  17 | jwt.decode(token, SECRET_KEY, algorithms=["HS256"], audience="myapp")
 
-     v2 (latest) -- change #c1a8..., 2m ago
-        reasoning: "Pinned algorithms to HS256 to prevent algorithm confusion attacks."
-        diff: - payload = jwt.decode(token, os.environ["SECRET_KEY"])
-              + payload = jwt.decode(token, os.environ["SECRET_KEY"], algorithms=["HS256"])
+     v3 (latest) -- human / uncommitted / just now
+        author: Sunil Mallya
+        diff: - jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+              + jwt.decode(token, SECRET_KEY, algorithms=["HS256"], audience="myapp")
 
-     v1 -- change #a0e1..., 5m ago
-        reasoning: "Initial JWT decode without algorithm restriction."
+     v2 -- agent / a1f3 / 3m ago
+        user-prompt: "pin JWT to HS256 only"
+        reasoning:   "Restricted to HS256 to prevent algorithm confusion attacks."
+        diff: - jwt.decode(token, SECRET_KEY)
+              + jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+
+     v1 -- agent / a1f3 / 8m ago
+        user-prompt: "add auth middleware"
+        reasoning:   "JWT decode without algorithm restriction."
 ```
+
+### Human + Agent Iterations
+
+Real vibe coding is iterative — the agent writes code, you tweak it, the agent refines it. AgentDiff tracks both sides. When a human edits lines within an agent-written block, each line keeps its correct attribution:
+
+```
+$ agentdiff blame prompt.py
+
+     1 | SYSTEM_PROMPT = """You are a support ticket classifier.
+     2 | Analyze each ticket and extract structured data.
+     ...
+    21 | - positive, neutral, negative, or mixed
+       -- agent / 55d2 / 11m ago (v1, L1-21)
+          user-prompt: "improve the prompt to include more instructions"
+
+    22 | ## Output Format
+       -- agent / c3d5 / 7m ago (v2, L22)
+          user-prompt: "fix prompt a little"
+
+    23 | Sunil edits this
+       -- human (no agent change recorded)
+
+    24 | Respond with a single JSON object (no markdown fences):
+     ...
+    41 | - Use null (not the string "null") for missing fields."""
+       -- agent / c3d5 / 7m ago (v1, L24-41)
+          user-prompt: "fix prompt a little"
+```
+
+Line 23 was inserted by a human — it shows up as `human`. The agent-written lines around it keep their prompt and reasoning. No attribution is lost.
 
 ---
 
@@ -157,6 +195,9 @@ Every time the agent writes or edits a file:
 | **spec** | Keyword-matched against `##` headings in your spec markdown |
 | **provenance** | `agent` (from hook) or `human` (everything else) |
 | **scope** | Files mentioned in the task prompt are in-scope; others are flagged |
+| **git info** | Uncommitted human edits detected via `git diff` (author, status) |
+
+**Human edits** are detected automatically. When you modify agent-written code (in your editor, vim, etc.), AgentDiff uses `git diff` to identify which lines you changed. Agent-written lines that you didn't touch keep their original attribution — only the lines you actually modified show as human. In non-git repos, human lines fall back to "no agent change recorded."
 
 ---
 
@@ -175,6 +216,13 @@ Claude Code                          AgentDiff                        Git
                                       v
                                    .agentdiff/sessions/
                                      <session_id>/changes.jsonl
+
+Human edits (vim, VS Code, etc.)     agentdiff blame
+                                      |-- reads JSONL for agent lines
+                                      |-- runs git diff for human lines
+                                      |-- difflib matches surviving agent lines
+                                      v
+                                   per-line attribution (agent or human)
 ```
 
 **Hooks** are shell scripts that pipe Claude Code event JSON to a local daemon over a unix socket. Under 5ms. Zero dependencies. Fail-open (`|| true`).

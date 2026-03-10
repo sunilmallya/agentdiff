@@ -8,10 +8,12 @@ so that unchanged lines keep their original attribution.
 from __future__ import annotations
 
 import difflib
+import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentdiff.models.changes import ChangeRecord
+from agentdiff.models.changes import ChangeRecord, GitBlameInfo
 
 
 @dataclass
@@ -22,6 +24,7 @@ class BlameLine:
     change: ChangeRecord | None = None
     version: int = 0
     overwritten: bool = False
+    git_info: GitBlameInfo | None = None
 
 
 @dataclass
@@ -118,6 +121,14 @@ def blame_file(project_root: str, file_path: str) -> list[BlameLine]:
                 version_counts[ln] = version_counts.get(ln, 0) + 1
                 blame[line_idx].version = version_counts[ln]
 
+    # Pass 3: Mark uncommitted human edits (lines changed in working tree)
+    has_human_lines = any(bl.change is None for bl in blame)
+    if has_human_lines:
+        uncommitted = _get_uncommitted_lines(str(abs_path))
+        for bl in blame:
+            if bl.change is None and bl.line_number in uncommitted:
+                bl.git_info = uncommitted[bl.line_number]
+
     return blame
 
 
@@ -155,7 +166,12 @@ def blame_line_history(project_root: str, file_path: str, line_number: int) -> B
 
 
 def _find_content_lines(file_lines: list[str], content: str) -> list[int]:
-    """Find which line indices in file_lines contain the given content."""
+    """Find which line indices in file_lines contain the given content.
+
+    Uses exact block matching first. Falls back to difflib line-by-line
+    matching when humans have inserted or modified lines within an
+    agent-edited block.
+    """
     if not content or not file_lines:
         return []
 
@@ -166,14 +182,25 @@ def _find_content_lines(file_lines: list[str], content: str) -> list[int]:
     matched_indices = set()
     file_text = "\n".join(file_lines)
 
-    # Find first occurrence only — avoids false positives when content
-    # appears multiple times (e.g., "return None" in many functions)
-    idx = file_text.find(content)
+    # Fast path: exact block match
+    # Strip trailing newline so "line1\nline2\n" matches "line1\nline2"
+    idx = file_text.find(content.rstrip("\n"))
     if idx != -1:
         prefix = file_text[:idx]
         start_line = prefix.count("\n")
         end_line = start_line + len(content_lines) - 1
         matched_indices.update(range(start_line, end_line + 1))
+        return sorted(matched_indices)
+
+    # Fallback: line-by-line matching via difflib.
+    # When humans insert or modify lines within an agent-edited block,
+    # the exact match fails. SequenceMatcher finds individual lines
+    # from the edit that still exist unchanged in the current file.
+    matcher = difflib.SequenceMatcher(None, content_lines, file_lines)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for offset in range(j2 - j1):
+                matched_indices.add(j1 + offset)
 
     return sorted(matched_indices)
 
@@ -201,3 +228,71 @@ def _paths_match(stored_path: str, current_path: str, project_root: str = "") ->
             pass
 
     return False
+
+
+def _get_uncommitted_lines(file_path: str) -> dict[int, GitBlameInfo]:
+    """Find lines modified in the working tree but not yet committed.
+
+    Uses `git diff` to detect uncommitted human edits. Returns {1-based line: GitBlameInfo}.
+    Returns empty dict if not a git repo, file is not tracked, or git is not installed.
+    """
+    import time as _time
+
+    file_dir = str(Path(file_path).parent)
+
+    try:
+        # git diff HEAD covers both staged and unstaged changes vs HEAD
+        result = subprocess.run(
+            ["git", "diff", "--unified=0", "HEAD", "--", file_path],
+            capture_output=True, text=True, timeout=10, cwd=file_dir,
+        )
+        if result.returncode != 0:
+            return {}
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return {}
+
+    diff_output = result.stdout
+
+    if not diff_output.strip():
+        return {}
+
+    # Parse unified diff hunk headers: @@ -old_start,old_count +new_start,new_count @@
+    _HUNK_RE = re.compile(r'\+(\d+)(?:,(\d+))?')
+    changed_lines: set[int] = set()
+    for line in diff_output.split("\n"):
+        if not line.startswith("@@"):
+            continue
+        m = _HUNK_RE.search(line)
+        if not m:
+            continue
+        start = int(m.group(1))
+        count = int(m.group(2)) if m.group(2) else 1
+        for ln in range(start, start + count):
+            changed_lines.add(ln)
+
+    if not changed_lines:
+        return {}
+
+    # Get current user name from git config
+    author = ""
+    try:
+        author_result = subprocess.run(
+            ["git", "config", "user.name"],
+            capture_output=True, text=True, timeout=5, cwd=file_dir,
+        )
+        if author_result.returncode == 0:
+            author = author_result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+
+    now = _time.time()
+    line_map = {}
+    for ln in changed_lines:
+        line_map[ln] = GitBlameInfo(
+            commit_hash="uncommitted",
+            author=author,
+            timestamp=now,
+            summary="uncommitted changes",
+        )
+
+    return line_map

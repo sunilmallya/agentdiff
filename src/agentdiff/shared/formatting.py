@@ -131,24 +131,46 @@ def format_blame_lines(blame_lines: list, *, color: bool = False) -> None:
                 print(f"          {_BOLD}\033[31m!! OUT OF SCOPE{_RESET}" if color else
                       f"          !! OUT OF SCOPE")
         else:
-            if color:
-                print(f"  {_DIM}{'':>5} -- human (no agent change recorded){_RESET}")
+            gi = group[0].git_info
+            if gi and gi.commit_hash:
+                age = _relative_time(gi.timestamp)
+                hash_display = gi.commit_hash if gi.commit_hash == "uncommitted" else gi.commit_hash[:7]
+                if color:
+                    print(f"  {_DIM}{'':>5} -- human / {hash_display} / {age}{_RESET}")
+                    if gi.author:
+                        print(f"          {_LABEL}author:{_RESET} {_PROMPT_TEXT}{gi.author}{_RESET}")
+                else:
+                    print(f"       -- human / {hash_display} / {age}")
+                    if gi.author:
+                        print(f"          author: {gi.author}")
             else:
-                print(f"       -- human (no agent change recorded)")
+                if color:
+                    print(f"  {_DIM}{'':>5} -- human (no agent change recorded){_RESET}")
+                else:
+                    print(f"       -- human (no agent change recorded)")
 
         print()
 
 
 def _group_by_change(blame_lines: list) -> list:
-    """Group consecutive blame lines that share the same change_id."""
+    """Group consecutive blame lines that share the same change_id or git commit."""
     if not blame_lines:
         return []
+
+    def _group_key(bl):
+        if bl.change:
+            return bl.change.change_id
+        gi = bl.git_info
+        if gi and gi.commit_hash:
+            return f"git:{gi.commit_hash}"
+        return None
+
     groups = []
     current_group = [blame_lines[0]]
-    current_id = blame_lines[0].change.change_id if blame_lines[0].change else None
+    current_id = _group_key(blame_lines[0])
 
     for bl in blame_lines[1:]:
-        bl_id = bl.change.change_id if bl.change else None
+        bl_id = _group_key(bl)
         if bl_id == current_id:
             current_group.append(bl)
         else:

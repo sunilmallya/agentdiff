@@ -45,3 +45,12 @@ class ChangeRecord:
     # Scope
     in_scope: Optional[bool] = None
     scope_files: list[str] = field(default_factory=list)
+
+
+@dataclass
+class GitBlameInfo:
+    """Git blame data for a single line."""
+    commit_hash: str = ""
+    author: str = ""
+    timestamp: float = 0.0
+    summary: str = ""  # first line of commit message
