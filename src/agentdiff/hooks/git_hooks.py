@@ -56,30 +56,43 @@ def pre_commit(project_root: str) -> None:
     if not matched:
         return
 
-    tasks: dict[str, dict] = {}
-    for c in matched:
-        if c.task_id not in tasks:
-            tasks[c.task_id] = {
-                "task_id": c.task_id,
-                "task_subject": c.task_subject,
-                "spec_section": c.spec_section,
-                "files": set(),
-                "change_count": 0,
-            }
-        tasks[c.task_id]["files"].add(c.file_path)
-        tasks[c.task_id]["change_count"] += 1
+    # Collect unique prompts (preserving order)
+    prompts = list(dict.fromkeys(c.prompt for c in matched if c.prompt))
 
-    summary = {
+    # Build per-file summaries
+    files: dict[str, dict] = {}
+    for c in matched:
+        fp = c.file_path
+        if fp not in files:
+            files[fp] = {"edits": 0, "reasoning": []}
+        files[fp]["edits"] += 1
+        if c.reasoning and c.reasoning not in files[fp]["reasoning"]:
+            files[fp]["reasoning"].append(c.reasoning)
+
+    # Collect scope violations
+    scope_violations = list(dict.fromkeys(
+        c.file_path for c in matched if c.in_scope is False
+    ))
+
+    # Collect tasks (if any)
+    tasks = []
+    seen_tasks: set[str] = set()
+    for c in matched:
+        if c.task_subject and c.task_id not in seen_tasks:
+            seen_tasks.add(c.task_id)
+            tasks.append({"task_id": c.task_id, "subject": c.task_subject})
+
+    summary: dict = {
         "agentdiff_version": "0.1.0",
         "total_changes": len(matched),
         "provenance": "agent",
-        "tasks": [
-            {**t, "files": list(t["files"])} for t in tasks.values()
-        ],
-        "scope_violations": [
-            c.file_path for c in matched if c.in_scope is False
-        ],
+        "prompts": prompts,
+        "files": {fp: info for fp, info in files.items()},
     }
+    if tasks:
+        summary["tasks"] = tasks
+    if scope_violations:
+        summary["scope_violations"] = scope_violations
 
     pending_path = agentdiff_dir / "pending-metadata.json"
     pending_path.write_text(json.dumps(summary, indent=2))

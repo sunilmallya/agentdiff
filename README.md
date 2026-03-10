@@ -226,7 +226,44 @@ Human edits (vim, VS Code, etc.)     agentdiff blame
 
 **The daemon** is a Python HTTP server (`ThreadingMixIn` + `AF_UNIX`) that appends change records to a per-session JSONL log. At session end, it calls `claude -p` (haiku) to generate reasoning summaries from the actual diffs.
 
-**Git notes** are a read-only projection of the change log onto commits, for PRs and CI.
+**Git notes** attach agent metadata to commits automatically — see below.
+
+---
+
+## Git Notes (automatic)
+
+Every commit gets a git note with the prompts, reasoning, and files the agent touched. This happens automatically via pre-commit and post-commit hooks — no extra steps.
+
+```
+$ git log --notes=agentdiff -1
+
+commit a3f1b2c
+Author: Sunil Mallya <mallya.16@gmail.com>
+Date:   Mon Mar 10 09:09:44 2026 -0700
+
+    add JWT auth
+
+Notes (agentdiff):
+    {
+      "total_changes": 3,
+      "provenance": "agent",
+      "prompts": [
+        "add login endpoint with JWT",
+        "pin JWT to HS256 only"
+      ],
+      "files": {
+        "src/auth.py": {
+          "edits": 3,
+          "reasoning": [
+            "Implemented email/password login returning a signed JWT.",
+            "Restricted to HS256 to prevent algorithm confusion attacks."
+          ]
+        }
+      }
+    }
+```
+
+A PR reviewer sees exactly what was asked, why the agent made each choice, and which files were agent-authored — without leaving `git log`. Notes travel with pushes (`git push origin refs/notes/agentdiff`) and are visible on GitHub via the API.
 
 ---
 
