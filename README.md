@@ -14,12 +14,6 @@ AgentDiff is **language agnostic** — it tracks changes to any file type (Pytho
 curl -fsSL https://raw.githubusercontent.com/sunilmallya/agentdiff/main/install.sh | sh
 ```
 
-Or with pip:
-
-```bash
-pip install agentdiff
-```
-
 Then initialize in any project directory:
 
 ```bash
